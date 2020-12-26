@@ -1,39 +1,48 @@
-package org.example.shorturl;
+package org.example.shorturl.service;
+
+import org.example.shorturl.dao.UrlDetailsDao;
+import org.example.shorturl.model.UrlDetails;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 
-public class UrlShortener {
+@Service
+public class ShortenerService {
 
     static final Integer SHORT_URL_LENGTH = 6;
+
+    @Autowired
+    UrlDetailsDao urlDetailsDao;
 
     public String shorten(String original) throws RuntimeException{
         if(original.isEmpty()){
             throw new InvalidUrlException();
         }
         String shortened = getRandomShortenedString(original);
-        while (url_map.containsKey(shortened)) {
+        while (urlDetailsDao.get(shortened).isPresent()) {
             shortened = getRandomShortenedString(padRandomChars(original));
         }
-        url_map.put(shortened, original);
+        urlDetailsDao.save(new UrlDetails(shortened, original));
         return shortened;
     }
 
     public String retrieve(String shortened) throws ShortUrlNotFoundException{
-        if(!url_map.containsKey(shortened)) {
+        Optional<UrlDetails> details = urlDetailsDao.get(shortened);
+        if(!details.isPresent()) {
             throw new ShortUrlNotFoundException();
         }
-        return url_map.get(shortened);
+        return details.get().originalUrl;
     }
 
-    public boolean assignIfAvailable(String original, String shortened) {
-        if(url_map.containsKey(shortened)) {
+    public Boolean assignIfAvailable(String original, String shortened) {
+        if(urlDetailsDao.get(shortened).isPresent()) {
             return false;
         }
-        url_map.put(shortened, original);
+        urlDetailsDao.save(new UrlDetails(shortened, original));
         return true;
     }
 
@@ -45,8 +54,6 @@ public class UrlShortener {
     private String getRandomShortenedString(String original) {
         return UUID.nameUUIDFromBytes(original.getBytes(StandardCharsets.UTF_8)).toString().substring(0, SHORT_URL_LENGTH);
     }
-
-    private Map<String, String> url_map = new HashMap<>();
 
     public class InvalidUrlException extends RuntimeException{}
     public class ShortUrlNotFoundException extends Exception {}
